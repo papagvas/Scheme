@@ -3,10 +3,11 @@ module Lib
       readExpr
     ) where
 
-import           Text.Megaparsec (oneOf, Parsec(..), parse, noneOf)
+import           Text.Megaparsec (oneOf, Parsec(..), parse, noneOf, try)
 import qualified Data.Void as Void (Void(..))
-import           Text.Megaparsec.Char (space1, letterChar, char)
-import           Control.Monad.Combinators (many, space1, digitChar, (<|>))
+import qualified Numeric as Num (readHex, readOct)
+import           Text.Megaparsec.Char (space1, letterChar, char, string, string', digitChar, alphaNumChar)
+import           Control.Monad.Combinators (many, (<|>))
 --import qualified Data.Text as Text (Text(..))
 
 type Parser = Parsec Void.Void String
@@ -25,6 +26,7 @@ data LispVal = Atom String
              | Number Integer
              | String String
              | Bool Bool
+             | Char Char
 
 parseString :: Parser LispVal
 parseString = do
@@ -38,10 +40,7 @@ parseAtom = do
   first <- letterChar <|> symbol
   leftovers <- many (letterChar <|> symbol <|> digitChar) -- perhaps replace letter + digit by alphaNumChar
   let atom = [first] ++ leftovers
-  return $ case atom of
-             "#t" -> Bool True
-             "#f" -> Bool False
-             otherwise -> Atom atom
+  (return .  Atom) atom
             
 parseNumber :: Parser LispVal
 parseNumber = parseDecimal1 <|> parseDecimal2 <|> parseOct <|> parseBin <|> parseHex >>= return 
@@ -55,7 +54,38 @@ parseDecimal1 :: Parser LispVal
 parseDecimal1 = some digitChar >>= return . Number . read
 
 parseDecimal2 :: Parser LispVal
-parseDecimal2 = 
+parseDecimal2 = do 
+  try $ string "#d"
+  xs <- some digitChar
+  (return . Number . read) x
+
+parseHex :: Parser LispVal
+parseHex = do
+  string "#x"
+  xs <- some hexDigitChar
+  (return . Number . hex2dec) xs
+
+parseOct :: Parser LispVal
+parseOct = do
+  string "#o"
+  xs <- some octDigitChar
+  (return . Number . oct2dec) xs
+
+parseBin :: Parser LispVal
+parseBin = do
+  string "#b"
+  xs <- some binDigitChar
+  (return . Number . bin2dec) xs
+
+hex2dec :: String -> Integer
+hex2dec = fst . head  . Num.readHex
+
+oct2dec :: String -> Integer
+oct2dec = fst . head . Num.readOct
+
+bin2dec :: String -> Integer
+bin2dec (x:"") = read [x]
+bin2dec (x:xs) = 2 ^ (length (x:xs) - 1) * (read [x]) + bin2dec xs
 
 parseBool :: Parser LispVal
 parseBool = do
@@ -65,5 +95,11 @@ parseBool = do
              't' -> Bool True
              'f' -> Bool False
 
+parseExpr :: Parser LispVal
+parseExpr = parseAtom <|> parseString <|> parseNumber <|> parseBool
 
-                                         
+--parseChar :: Parser LispVal
+--parseChar = do
+--  string "#\\"
+--  xs <- spaceChar <|> alphaNumChar <|> string' "space" <|> string' "newline" 
+--  return $ case xs of
