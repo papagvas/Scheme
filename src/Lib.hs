@@ -111,3 +111,4 @@ charName = do
   xs <- string' "space" <|> string' "newline"
   if map Char.toLower xs == "space" then return ' ' else return '\n'
 
+
