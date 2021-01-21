@@ -24,7 +24,7 @@ dependencies:
 - megaparsec
 - text
 - void
-
+- parser-combinators
 library:
   source-dirs: src
 

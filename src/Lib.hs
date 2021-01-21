@@ -3,11 +3,13 @@ module Lib
       readExpr
     ) where
 
+import qualified Data.Char as Char (toLower)
 import           Text.Megaparsec (oneOf, Parsec(..), parse, noneOf, try)
 import qualified Data.Void as Void (Void(..))
 import qualified Numeric as Num (readHex, readOct)
-import           Text.Megaparsec.Char (space1, letterChar, char, string, string', digitChar, alphaNumChar)
-import           Control.Monad.Combinators (many, (<|>))
+import           Control.Monad (liftM)
+import           Text.Megaparsec.Char (space1, letterChar, char, string, string', digitChar, alphaNumChar, hexDigitChar, binDigitChar, octDigitChar, spaceChar, symbolChar)
+import           Control.Monad.Combinators (many, (<|>), some)
 --import qualified Data.Text as Text (Text(..))
 
 type Parser = Parsec Void.Void String
@@ -57,23 +59,23 @@ parseDecimal2 :: Parser LispVal
 parseDecimal2 = do 
   try $ string "#d"
   xs <- some digitChar
-  (return . Number . read) x
+  (return . Number . read) xs
 
 parseHex :: Parser LispVal
 parseHex = do
-  string "#x"
+  try $ string "#x"
   xs <- some hexDigitChar
   (return . Number . hex2dec) xs
 
 parseOct :: Parser LispVal
 parseOct = do
-  string "#o"
+  try $ string "#o"
   xs <- some octDigitChar
   (return . Number . oct2dec) xs
 
 parseBin :: Parser LispVal
 parseBin = do
-  string "#b"
+  try $ string "#b"
   xs <- some binDigitChar
   (return . Number . bin2dec) xs
 
@@ -96,10 +98,16 @@ parseBool = do
              'f' -> Bool False
 
 parseExpr :: Parser LispVal
-parseExpr = parseAtom <|> parseString <|> parseNumber <|> parseBool
+parseExpr = foldl (<|>) (try parseChar) (map try [parseAtom, parseString, parseNumber, parseBool])
 
---parseChar :: Parser LispVal
---parseChar = do
---  string "#\\"
---  xs <- spaceChar <|> alphaNumChar <|> string' "space" <|> string' "newline" 
---  return $ case xs of
+parseChar :: Parser LispVal
+parseChar = do
+  string "#\\"
+  x <- spaceChar <|> alphaNumChar <|> charName 
+  return $ Char x 
+
+charName :: Parser Char
+charName = do
+  xs <- string' "space" <|> string' "newline"
+  if map Char.toLower xs == "space" then return ' ' else return '\n'
+
