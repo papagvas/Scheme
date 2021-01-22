@@ -6,7 +6,7 @@ module Lib
 import qualified Data.Char as Char (toLower)
 import           Text.Megaparsec (oneOf, Parsec(..), parse, noneOf, try)
 import qualified Data.Void as Void (Void(..))
-import qualified Numeric as Num (readHex, readOct)
+import qualified Numeric as Num (readHex, readOct, readFloat)
 import           Control.Monad (liftM)
 import           Text.Megaparsec.Char (space1, letterChar, char, string, string', digitChar, alphaNumChar, hexDigitChar, binDigitChar, octDigitChar, spaceChar, symbolChar)
 import           Control.Monad.Combinators (many, (<|>), some)
@@ -29,6 +29,7 @@ data LispVal = Atom String
              | String String
              | Bool Bool
              | Char Char
+             | Float Double
 
 parseString :: Parser LispVal
 parseString = do
@@ -98,7 +99,7 @@ parseBool = do
              'f' -> Bool False
 
 parseExpr :: Parser LispVal
-parseExpr = foldl (<|>) (try parseChar) (map try [parseAtom, parseString, parseNumber, parseBool])
+parseExpr = foldl (<|>) (try parseChar) (map try [parseAtom, parseString, parseFloat, parseNumber, parseBool])
 
 parseChar :: Parser LispVal
 parseChar = do
@@ -110,5 +111,12 @@ charName :: Parser Char
 charName = do
   xs <- string' "space" <|> string' "newline"
   if map Char.toLower xs == "space" then return ' ' else return '\n'
+
+parseFloat :: Parser LispVal
+parseFloat = do
+  xs <- some digitChar
+  char '.'
+  ys <- some digitChar
+  (return . Float . fst . head . Num.readFloat) $ xs ++ "." ++ ys
 
 
