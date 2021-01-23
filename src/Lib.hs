@@ -1,6 +1,8 @@
 module Lib
     ( 
       readExpr
+    , eval
+    , showVal
     ) where
 
 import qualified Data.Char as Char (toLower)
@@ -9,7 +11,7 @@ import qualified Data.Void as Void (Void(..))
 import qualified Numeric as Num (readHex, readOct, readFloat)
 import           Control.Monad (liftM)
 import           Text.Megaparsec.Char (space1, letterChar, char, string, string', digitChar, alphaNumChar, hexDigitChar, binDigitChar, octDigitChar, spaceChar, symbolChar)
-import           Control.Monad.Combinators (many, (<|>), some)
+import           Control.Monad.Combinators (many, (<|>), some, sepBy, sepEndBy)
 --import qualified Data.Text as Text (Text(..))
 
 type Parser = Parsec Void.Void String
@@ -17,10 +19,10 @@ type Parser = Parsec Void.Void String
 symbol :: Parser Char
 symbol = oneOf "!$%&|*+-/:<=?>@^_~"
 
-readExpr :: String -> String
-readExpr input = case parse (space1 >> symbol) "" input of
-  Left err -> "No match for: " ++ show err
-  Right str -> "Found value"
+readExpr :: String -> LispVal
+readExpr input = case parse (space1 >> parseExpr) "" input of
+  Left err -> String $ "No match for: " ++ show err
+  Right val -> val
 
 data LispVal = Atom String
              | List [LispVal]
@@ -99,7 +101,11 @@ parseBool = do
              'f' -> Bool False
 
 parseExpr :: Parser LispVal
-parseExpr = foldl (<|>) (try parseChar) (map try [parseAtom, parseString, parseFloat, parseNumber, parseBool])
+parseExpr = foldl (<|>) (try parseChar) (map try [parseAtom, parseString, parseFloat, parseNumber, parseList, parseQuoted, parseBool]) 
+            <|> do char '('
+                   x <- (try parseList) <|> parseDotList
+                   char ')'
+                   return x
 
 parseChar :: Parser LispVal
 parseChar = do
@@ -119,4 +125,61 @@ parseFloat = do
   ys <- some digitChar
   (return . Float . fst . head . Num.readFloat) $ xs ++ "." ++ ys
 
+parseList :: Parser LispVal
+parseList = liftM List $ parseExpr `sepBy` space1
 
+parseDotList :: Parser LispVal
+parseDotList = do
+  init <- parseExpr `sepEndBy` space1
+  tail <- char '.' >> space1 >> parseExpr
+  return $ DottedList init tail
+
+parseQuoted :: Parser LispVal
+parseQuoted = do
+  char '\''
+  x <- parseExpr
+  return $ List [Atom "quote", x] 
+
+showVal :: LispVal -> String
+showVal (String str) = "\"" ++ str ++ "\""
+showVal (Atom name) = name
+showVal (Number num) = show num
+showVal (Bool True) = "#t"
+showVal (Bool False) = "#f"
+showVal (List contents) = "(" ++ unwordsList contents ++ ")"
+showVal (DottedList init tail) = "(" ++ unwordsList init ++ " . " ++ showVal tail ++ ")"
+
+unwordsList :: [LispVal] -> String
+unwordsList = unwords . map showVal
+
+instance Show LispVal where show = showVal
+
+eval :: LispVal -> LispVal 
+eval val@(String _) = val
+eval val@(Number _) = val
+eval val@(Bool _) = val
+eval (List [Atom "quote", val]) = val
+
+apply :: String -> [LispVal] -> LispVal
+apply func args = maybe (Bool False) ($ args) $ lookup func primitives
+
+primitives :: [(String, [LispVal] -> LispVal)]
+primitives = [("+", numericBinop (+)),
+              ("-", numericBinop (-)),
+              ("*", numericBinop (*)),
+              ("/", numericBinop div),
+              ("mod", numericBinop mod),
+              ("quotient", numericBinop quot),
+              ("remainder", numericBinop rem)]
+
+numericBinop :: (Integer -> Integer -> Integer) -> [LispVal] -> LispVal
+numericBinop op params = Number $ foldl1 op $ map unpackNum params
+
+unpackNum :: LispVal -> Integer
+unpackNum (Number n) = n
+unpackNum (String n) = let parsed = reads n :: [(Integer, String)] in 
+                           if null parsed 
+                              then 0
+                              else fst $ parsed !! 0
+unpackNum (List [n]) = unpackNum n
+unpackNum _ = 0
