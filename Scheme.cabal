@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9d2dd04962458739f380de78d7d6b2bb87eaf907a13dd531a6d4448114521420
+-- hash: cd75d4673ee7ddd88ae4018a17d9130c377bdf355463bca2c557a1f04ecf5e9c
 
 name:           Scheme
 version:        0.1.0.0
@@ -34,13 +34,14 @@ library
       src
   build-depends:
       base >=4.7 && <5
-    , megaparsec
+    , megaparsec >=9.0
+    , mtl
     , parser-combinators
     , text
     , void
   default-language: Haskell2010
 
-executable Scheme-exe
+executable lisp
   main-is: Main.hs
   other-modules:
       Paths_Scheme
@@ -50,7 +51,8 @@ executable Scheme-exe
   build-depends:
       Scheme
     , base >=4.7 && <5
-    , megaparsec
+    , megaparsec >=9.0
+    , mtl
     , parser-combinators
     , text
     , void
@@ -67,7 +69,8 @@ test-suite Scheme-test
   build-depends:
       Scheme
     , base >=4.7 && <5
-    , megaparsec
+    , megaparsec >=9.0
+    , mtl
     , parser-combinators
     , text
     , void

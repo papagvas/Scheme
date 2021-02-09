@@ -1,6 +1,8 @@
 module Main where
 
 import           Lib
+
+import           Control.Monad (liftM)
 import qualified System.Environment as Env (getArgs)
 import           System.IO
 
@@ -27,7 +29,7 @@ runRepl :: IO ()
 runRepl = until_ (== "quit") (readPrompt "Lisp>>> ") evalAndPrint
 
 main :: IO ()
-main = do args <- getArgs
+main = do args <- Env.getArgs
           case length args of
                0 -> runRepl
                1 -> evalAndPrint $ args !! 0
